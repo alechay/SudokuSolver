@@ -5,9 +5,17 @@ from PyQt5.QtCore import *
 import numpy as np
 import pandas as pd
 import functools
-# import time
-# import signal
+import time
+import signal
+import subprocess
 
+class TimeoutException(Exception):
+    pass
+
+def timeout_handler(signum, frame):
+    raise TimeoutException
+
+signal.signal(signal.SIGALRM, timeout_handler)
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -54,7 +62,7 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.pybutton1, 1, 0, 1, 1)
 
         self.widget.setLayout(self.layout)
-        self.setCentralWidget(self.widget) 
+        self.setCentralWidget(self.widget)
 
     def possible(self,grid,y,x,n):
     	for i in range(0,9):
@@ -72,16 +80,16 @@ class MainWindow(QMainWindow):
     	return True
 
     def solve(self, grid, solutions):
-    	for y in range(9):
-    		for x in range(9):
-    			if grid[y][x] == 0 :
-    				for n in range(1,10) :
-    					if self.possible(grid,y,x,n):
-    						grid[y][x] = n
-    						self.solve(grid, solutions)
-    						grid[y][x] = 0
-    				return
-    	solutions.append(np.matrix(grid))
+        for y in range(9):
+            for x in range(9):
+                if grid[y][x] == 0 :
+                    for n in range(1,10) :
+                        if self.possible(grid,y,x,n):
+                            grid[y][x] = n
+                            self.solve(grid, solutions)
+                            grid[y][x] = 0
+                    return
+        solutions.append(np.matrix(grid))
 
     def clickMethod(self):
         text = []
@@ -105,10 +113,12 @@ class MainWindow(QMainWindow):
                 regex=True) for i in range(9)])
         
         if np.any(self.mask == False):
+            subprocess.call(['afplay', 'waaaha.m4a'])
             self.alert = QMessageBox()
             self.alert.setText("Enter a valid integer 1-9")
             self.alert.exec_()
         else:
+            signal.alarm(5)
             self.df = self.df.astype(int)
             self.data = self.df.to_numpy().tolist()
       #       self.grid = [[3,0,0,8,0,1,0,0,2],
@@ -121,18 +131,21 @@ class MainWindow(QMainWindow):
 						# [9,0,4,0,8,0,7,0,5],
 						# [6,0,0,1,0,7,0,0,3]]
             self.solutions = []
-            self.solve(self.data, self.solutions)
-            self.second = Second(self.solutions)
-            self.second.show()
+            # self.solve(self.data, self.solutions)
+            # self.second = Second(self.solutions)
+            # self.second.show()
 
-            # try:
-            # 	self.solve(self.data, self.solutions)
-            # 	self.second = Second(self.solutions)
-            # 	self.second.show()
-            # except TimeoutException:
-            # 	self.alert = QMessageBox()
-            # 	self.alert.setText("Too many solutions/ entered incorrectly")
-            # 	self.alert.exec_()
+            try:
+                self.solve(self.data, self.solutions)
+                signal.alarm(0)
+                subprocess.call(['afplay', 'lets_go.m4a'])
+                self.second = Second(self.solutions)
+                self.second.show()
+            except TimeoutException:
+                subprocess.call(['afplay', 'waaaha.m4a'])
+                self.alert = QMessageBox()
+                self.alert.setText("Error! Could be 1 of 3 things:\n 1) The board is entered wrong\n 2) There are too many solutions\n 3) There are no solutions")
+                self.alert.exec_()
 
     def clearMethod(self):
         self.table.clearContents() 
@@ -150,6 +163,8 @@ class Second(QMainWindow):
 
         self.l1 = QLabel(f"There are {self.num_sols} solutions")
 
+        self.l2 = QLabel(f"There is {self.num_sols} solution")
+
         self.comboBox = QComboBox()
         for i in range(self.num_sols):
         	self.comboBox.addItem(f"{i+1}")
@@ -158,7 +173,10 @@ class Second(QMainWindow):
 
         self.comboBox.activated[str].connect(self.onChanged)
 
-        self.layout.addWidget(self.l1, 0, 0)
+        if self.num_sols == 1:
+            self.layout.addWidget(self.l2, 0, 0)
+        else:
+            self.layout.addWidget(self.l1, 0, 0)
         self.layout.addWidget(self.comboBox, 1, 0)
         self.layout.addWidget(self.table, 2, 0)
 
