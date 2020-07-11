@@ -7,7 +7,8 @@ import pandas as pd
 import functools
 import time
 import signal
-import subprocess
+from playsound import playsound
+import threading
 
 class TimeoutException(Exception):
     pass
@@ -16,6 +17,9 @@ def timeout_handler(signum, frame):
     raise TimeoutException
 
 signal.signal(signal.SIGALRM, timeout_handler)
+
+def play_sound():
+    playsound('PycharmProjects/lets_go.m4a')
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -145,14 +149,14 @@ class MainWindow(QMainWindow):
         self.mask = functools.reduce(np.logical_and, [self.df[i].str.contains('^\d{1}$', regex=True) for i in range(9)])
 
         if np.any(self.mask == False):
-            subprocess.call(['afplay', 'waaaha.m4a'])
+            playsound('PycharmProjects/waaaha.m4a')
             self.alert = QMessageBox()
             self.alert.setText("Enter a valid integer 1-9")
             self.alert.exec_()
         else:
             self.df = self.df.astype(int)
             self.data = self.df.to_numpy().tolist()
-            #       self.grid = [[3,0,0,8,0,1,0,0,2],
+            # self.grid = [[3,0,0,8,0,1,0,0,2],
             # [2,0,1,0,3,0,6,0,4],
             # [0,0,0,2,0,4,0,0,0],
             # [8,0,9,0,0,0,1,0,6],
@@ -163,7 +167,7 @@ class MainWindow(QMainWindow):
             # [6,0,0,1,0,7,0,0,3]]
             self.solutions = []
             if self.isValidSudoku(self.data) == False:
-                subprocess.call(['afplay', 'waaaha.m4a'])
+                playsound('PycharmProjects/waaaha.m4a')
                 self.alert = QMessageBox()
                 self.alert.setText("Invalid sudoku board entered")
                 self.alert.exec_()
@@ -172,12 +176,14 @@ class MainWindow(QMainWindow):
                 try:
                     self.solve(self.data, self.solutions)
                     signal.alarm(0)
-                    subprocess.call(['afplay', 'lets_go.m4a'])
+                    x = threading.Thread(target=play_sound)
+                    x.start()
+                    # playsound('PycharmProjects/lets_go.m4a')
                     self.second = Second(self.solutions)
                     self.second.show()
                 except TimeoutException:
                     # self.alert.setText("Error! Could be 1 of 3 things:\n 1) The board is entered wrong\n 2) There are too many solutions\n 3) There are no solutions")
-                    subprocess.call(['afplay', 'waaaha.m4a'])
+                    playsound('PycharmProjects/waaaha.m4a')
                     self.alert = QMessageBox()
                     self.alert.setText("The board entered has too many solutions")
                     self.alert.setInformativeText("Showing a few solutions, if enough time has passed to find some")
