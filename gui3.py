@@ -1,4 +1,5 @@
 import sys
+import os
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -19,7 +20,7 @@ def timeout_handler(signum, frame):
 signal.signal(signal.SIGALRM, timeout_handler)
 
 def play_sound():
-    playsound('PycharmProjects/lets_go.m4a')
+    playsound(f'{os.path.dirname(os.path.abspath(__file__))}/lets_go.m4a')
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -138,7 +139,7 @@ class MainWindow(QMainWindow):
                 item = self.table.item(row,column)
                 if item is None:
                     rowdata.append('0')
-                elif item.text() is '':
+                elif item.text() == '':
                     rowdata.append('0')
                 else:
                     rowdata.append(item.text())
@@ -149,7 +150,7 @@ class MainWindow(QMainWindow):
         self.mask = functools.reduce(np.logical_and, [self.df[i].str.contains('^\d{1}$', regex=True) for i in range(9)])
 
         if np.any(self.mask == False):
-            playsound('PycharmProjects/waaaha.m4a')
+            playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
             self.alert = QMessageBox()
             self.alert.setText("Enter a valid integer 1-9")
             self.alert.exec_()
@@ -167,7 +168,7 @@ class MainWindow(QMainWindow):
             # [6,0,0,1,0,7,0,0,3]]
             self.solutions = []
             if self.isValidSudoku(self.data) == False:
-                playsound('PycharmProjects/waaaha.m4a')
+                playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
                 self.alert = QMessageBox()
                 self.alert.setText("Invalid sudoku board entered")
                 self.alert.exec_()
@@ -183,7 +184,7 @@ class MainWindow(QMainWindow):
                     self.second.show()
                 except TimeoutException:
                     # self.alert.setText("Error! Could be 1 of 3 things:\n 1) The board is entered wrong\n 2) There are too many solutions\n 3) There are no solutions")
-                    playsound('PycharmProjects/waaaha.m4a')
+                    playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
                     self.alert = QMessageBox()
                     self.alert.setText("The board entered has too many solutions")
                     self.alert.setInformativeText("Showing a few solutions, if enough time has passed to find some")
