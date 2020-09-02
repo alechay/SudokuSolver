@@ -6,10 +6,9 @@ from PyQt5.QtCore import *
 import numpy as np
 import pandas as pd
 import functools
-import time
 import signal
 from playsound import playsound
-import threading
+from modules import solver
 
 class TimeoutException(Exception):
     pass
@@ -18,9 +17,6 @@ def timeout_handler(signum, frame):
     raise TimeoutException
 
 signal.signal(signal.SIGALRM, timeout_handler)
-
-def play_sound():
-    playsound(f'{os.path.dirname(os.path.abspath(__file__))}/lets_go.m4a')
 
 class TableModel(QtCore.QAbstractTableModel):
     def __init__(self, data):
@@ -69,74 +65,12 @@ class MainWindow(QMainWindow):
         self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)
 
-    def isValidSudoku(self, board):
-        # check rows for duplicates
-        for row in board:
-            nums = [i for i in row if i!=0]
-            if len(set(nums)) < len(nums):
-                return False
-        # get columns
-        columns = []
-        for i in range(9):
-            column = [board[j][i] for j in range(9)]
-            columns.append(column)
-        # check columns for duplicates
-        for column in columns:
-            nums = [i for i in column if i!=0]
-            if len(set(nums)) < len(nums):
-                return False
-        # get blocks
-        row_chunks = []
-        for row in board:
-            chunks = [row[i * 3:(i + 1) * 3] for i in range((len(row) + 3 - 1) // 3 )]
-            row_chunks.append(chunks)
-        blocks = []
-        for i in range(0, 9, 3):
-            for j in range(3):
-                block = [item[j] for item in row_chunks[i:i+3]]
-                block = [x for y in block for x in y]
-                blocks.append(block)
-        # check blocks for duplicates
-        for block in blocks:
-            nums = [i for i in block if i!=0]
-            if len(set(nums)) < len(nums):
-                return False
-
-        return True
-
-    def possible(self,grid,y,x,n):
-        for i in range(0,9):
-            if grid[y][i] == n:
-                return False
-        for i in range(0,9):
-            if grid[i][x] == n:
-                return False
-        x0 = (x//3)*3
-        y0 = (y//3)*3
-        for i in range(0,3):
-            for j in range(0,3):
-                if grid[y0+i][x0+i] == n :
-                    return False
-        return True
-
-    def solve(self, grid, solutions):
-        for y in range(9):
-            for x in range(9):
-                if grid[y][x] == 0 :
-                    for n in range(1,10) :
-                        if self.possible(grid,y,x,n):
-                            grid[y][x] = n
-                            self.solve(grid, solutions)
-                            grid[y][x] = 0
-                    return
-        solutions.append(np.matrix(grid))
-
-    def clickMethod(self):
+    def collectTableData(self, table):
         text = []
-        for row in range(self.table.rowCount()):
+        for row in range(table.rowCount()):
             rowdata = []
-            for column in range(self.table.columnCount()):
-                item = self.table.item(row,column)
+            for column in range(table.columnCount()):
+                item = table.item(row,column)
                 if item is None:
                     rowdata.append('0')
                 elif item.text() == '':
@@ -146,17 +80,39 @@ class MainWindow(QMainWindow):
             
             text.append(rowdata)
 
-        self.df = pd.DataFrame(text)
-        self.mask = functools.reduce(np.logical_and, [self.df[i].str.contains('^\d{1}$', regex=True) for i in range(9)])
+        df = pd.DataFrame(text)
+        mask = functools.reduce(np.logical_and, [df[i].str.contains('^\d{1}$', regex=True) for i in range(9)])
+        return df, mask
 
-        if np.any(self.mask == False):
-            playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
+    def trySolve(self, data):
+        solutions = []
+        signal.alarm(5)
+        try:
+            solver.solve(data, solutions)
+            signal.alarm(0)
+            playsound(f'{os.path.dirname(os.path.abspath(__file__))}/sounds/lets_go.m4a')
+            self.second = Second(solutions)
+            self.second.show()
+        except TimeoutException:
+            playsound(f'{os.path.dirname(os.path.abspath(__file__))}/sounds/waaaha.m4a')
+            self.alert = QMessageBox()
+            self.alert.setText("The board entered has too many solutions")
+            self.alert.setInformativeText("Showing a few solutions, if enough time has passed to find some")
+            self.alert.exec_()
+            self.second = Second(solutions)
+            self.second.show()
+    
+    def clickMethod(self):
+        df, mask = self.collectTableData(self.table)
+
+        if np.any(mask == False):
+            playsound(f'{os.path.dirname(os.path.abspath(__file__))}/sounds/waaaha.m4a')
             self.alert = QMessageBox()
             self.alert.setText("Enter a valid integer 1-9")
             self.alert.exec_()
         else:
-            self.df = self.df.astype(int)
-            self.data = self.df.to_numpy().tolist()
+            df = df.astype(int)
+            data = df.to_numpy().tolist()
             # self.grid = [[3,0,0,8,0,1,0,0,2],
             # [2,0,1,0,3,0,6,0,4],
             # [0,0,0,2,0,4,0,0,0],
@@ -166,31 +122,13 @@ class MainWindow(QMainWindow):
             # [0,0,0,5,0,9,0,0,0],
             # [9,0,4,0,8,0,7,0,5],
             # [6,0,0,1,0,7,0,0,3]]
-            self.solutions = []
-            if self.isValidSudoku(self.data) == False:
-                playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
+            if solver.isValidSudoku(data) == False:
+                playsound(f'{os.path.dirname(os.path.abspath(__file__))}/sounds/waaaha.m4a')
                 self.alert = QMessageBox()
                 self.alert.setText("Invalid sudoku board entered")
                 self.alert.exec_()
             else:
-                signal.alarm(5)
-                try:
-                    self.solve(self.data, self.solutions)
-                    signal.alarm(0)
-                    x = threading.Thread(target=play_sound)
-                    x.start()
-                    # playsound('PycharmProjects/lets_go.m4a')
-                    self.second = Second(self.solutions)
-                    self.second.show()
-                except TimeoutException:
-                    # self.alert.setText("Error! Could be 1 of 3 things:\n 1) The board is entered wrong\n 2) There are too many solutions\n 3) There are no solutions")
-                    playsound(f'{os.path.dirname(os.path.abspath(__file__))}/waaaha.m4a')
-                    self.alert = QMessageBox()
-                    self.alert.setText("The board entered has too many solutions")
-                    self.alert.setInformativeText("Showing a few solutions, if enough time has passed to find some")
-                    self.alert.exec_()
-                    self.second = Second(self.solutions)
-                    self.second.show()
+                self.trySolve(data)
 
     def clearMethod(self):
         self.table.clearContents() 
