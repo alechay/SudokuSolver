@@ -2,18 +2,11 @@
 Sudoku solver using recursion and backtracking. GUI created with PyQt5
 
 ## Usage
-- Tested on macOS Mojave Version 10.14.6
-- Python 3.7.6
+- Tested on macOS Catalina Version 10.15.6
+- Python 3.8.3
 
 ## Dependencies
-- PyQt5
-- numpy
-- pandas
-- functools
-- sys
-- time
-- signal
-- subprocess
+- See requirements.txt
 
 ## Bugs
 No known bugs at this time
